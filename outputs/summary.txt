@@ -1,0 +1,12 @@
+[02] moon n=256: edge leak=0.00025 save=77.6% | direct leak=0.00015 save=87.0% | edge/direct leak x1.64
+[03] moon 16x16: ref CR~1000 | dimming sysCR~19958 leak=0.00015 halo_mean=0.00029 save=87.0%
+[04] zone sweep (avg of 6 scenes) counts=1,4,16,64,256,1024,4096
+     direct save%=0,8,43,71,82,87,89
+     direct leak =0.00114,0.00106,0.00069,0.00041,0.00029,0.00024,0.00023
+     direct sysCR=998,1252,3916,13935,17857,18747,19053
+     edge   save%=0,12,46,59,64,77,90
+     edge   leak =0.00114,0.00101,0.00066,0.00052,0.00047,0.00041,0.00041
+[05] starfield 64x64: save=93.2% psnr=39.2 clip=0.24% sysCR=14318
+[05]      moon 64x64: save=90.0% psnr=60.5 clip=0.05% sysCR=20000
+[05]       hud 64x64: save=78.9% psnr=35.0 clip=1.82% sysCR=63
+[05]  gradient 64x64: save=71.8% psnr=51.7 clip=0.10% sysCR=19
