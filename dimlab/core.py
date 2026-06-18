@@ -60,11 +60,21 @@ def _zone_pool(target: np.ndarray, zy: int, zx: int, percentile: float) -> np.nd
 
 
 def _upsample_nearest(zone: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    """ゾーン配列を画素解像度へ最近傍展開する。
+
+    _zone_pool と同じ linspace 境界でブロックを埋めることで、
+    「どの画素がどのゾーンに属するか」をプール側と完全に一致させる
+    (整数除算だと境界が 1〜2 画素ずれることがある)。
+    """
     h, w = shape
     zy, zx = zone.shape
-    yi = np.minimum((np.arange(h) * zy) // h, zy - 1)
-    xi = np.minimum((np.arange(w) * zx) // w, zx - 1)
-    return zone[yi][:, xi]
+    ys = np.linspace(0, h, zy + 1).astype(int)
+    xs = np.linspace(0, w, zx + 1).astype(int)
+    out = np.zeros((h, w), dtype=zone.dtype)
+    for i in range(zy):
+        for j in range(zx):
+            out[ys[i]:ys[i + 1], xs[j]:xs[j + 1]] = zone[i, j]
+    return out
 
 
 def simulate(
@@ -92,12 +102,23 @@ def simulate(
                 各「ゾーン」は列ストリップ (全高) になる 1 次元制御。
     """
     target = np.clip(np.asarray(target, dtype=float), 0.0, 1.0)
+    if target.ndim != 2:
+        raise ValueError("target must be a 2D array of shape (H, W)")
     h, w = target.shape
+    if zones_y < 1 or zones_x < 1:
+        raise ValueError("zones_y and zones_x must be >= 1")
+    if panel_cr <= 1.0:
+        raise ValueError("panel_cr must be > 1 (transmission floor = 1/panel_cr)")
     t_floor = 1.0 / panel_cr
 
     if edge:
         # エッジライト: 導光板で実質 1 次元しか絞れない → 列ストリップ (全高)
         zones_y = 1
+
+    # バックライトのゾーンは画素より細かくはできない (1 ゾーン >= 1 画素)。
+    # 画素数を超えるゾーン指定は物理的に無意味なので画像サイズで頭打ちにする。
+    zones_y = min(zones_y, h)
+    zones_x = min(zones_x, w)
 
     # 1) ゾーンごとのバックライト指令値を決める
     bl_zone = _zone_pool(target, zones_y, zones_x, percentile)
@@ -165,8 +186,9 @@ def metrics(res: DimResult) -> dict:
     t_floor = 1.0 / res.panel_cr
 
     dark = _dark_mask(target)
-    near = _near_bright_mask(target) & dark      # 明部の近くの黒 = ハロが出る所
-    far = (~_near_bright_mask(target)) & dark     # 明部から遠い黒 = 真の黒が出る所
+    near_bright = _near_bright_mask(target)       # 1 回だけ計算して使い回す
+    near = near_bright & dark      # 明部の近くの黒 = ハロが出る所
+    far = (~near_bright) & dark     # 明部から遠い黒 = 真の黒が出る所
     has_dark = bool(dark.any())
 
     # 省電力: バックライト指令の平均 (全点灯 = 1.0 を基準)
